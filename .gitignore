@@ -1,0 +1,15 @@
+# backend 
+/backend/node_modules
+/backend/package.json
+/backend/package-lock.json
+/backend/src/prisma
+
+# frontend
+/frontend/node_modules
+/frontend/package-lock.json
+/frontend/package.json
+
+# root
+vite.config.js
+Inventory-managment.md
+Smart_Inventory_System_Overview.docx
