@@ -4,7 +4,7 @@ import {
   getLowStockItems,
   getExpiringSoon,
   getExpiryStats,
-} from "../api/inventoryApi"; // ← getExpiringSoon + getExpiryStats added
+} from "../api/inventoryApi";
 import { getOrders } from "../api/ordersApi";
 import {
   BarChart,
@@ -15,30 +15,27 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import CautionLevelBadge from "../components/inventory/CautionLevelBadge";
-import { format, differenceInDays, isPast, isToday } from "date-fns"; // ← date-fns added
+import { format, differenceInDays, isPast, isToday } from "date-fns";
 import { Link } from "react-router-dom";
 
 export default function Dashboard() {
   const [items, setItems] = useState([]);
   const [orders, setOrders] = useState([]);
   const [lowStock, setLowStock] = useState([]);
-  const [expiringSoon, setExpiringSoon] = useState([]); // ← NEW
-  const [expiryStats, setExpiryStats] = useState(null); // ← NEW
+  const [expiringSoon, setExpiringSoon] = useState([]);
+  const [expiryStats, setExpiryStats] = useState(null);
 
   useEffect(() => {
     getItems().then(setItems).catch(console.error);
     getOrders().then(setOrders).catch(console.error);
     getLowStockItems().then(setLowStock).catch(console.error);
-    getExpiringSoon(3).then(setExpiringSoon).catch(console.error); // ← NEW
-    getExpiryStats().then(setExpiryStats).catch(console.error); // ← NEW
+    getExpiringSoon(3).then(setExpiringSoon).catch(console.error);
+    getExpiryStats().then(setExpiryStats).catch(console.error);
   }, []);
 
   const topItems = [...items]
     .sort((a, b) => b.current_stock - a.current_stock)
     .slice(0, 8);
-  const todayOrders = orders.filter(
-    (o) => new Date(o.created_at).toDateString() === new Date().toDateString(),
-  );
   const urgentExpiry =
     (expiryStats?.alreadyExpired || 0) + (expiryStats?.expiringToday || 0);
 
@@ -46,10 +43,10 @@ export default function Dashboard() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
 
-      {/* KPI Cards */}
+      {/* KPI Cards — Phase 4: 4th card = Need Reorder */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: "Total Items", value: items.length },
+          { label: "Total Items", value: items.length, warn: false },
           {
             label: "Low Stock",
             value: lowStock.length,
@@ -59,8 +56,12 @@ export default function Dashboard() {
             label: "Expiring Soon",
             value: expiryStats?.expiringIn7Days ?? "…",
             warn: urgentExpiry > 0,
-          }, // ← NEW
-          { label: "Orders Today", value: todayOrders.length },
+          },
+          {
+            label: "Need Reorder",
+            value: lowStock.length,
+            warn: lowStock.length > 0,
+          }, // ← Phase 4
         ].map((card) => (
           <div
             key={card.label}
@@ -76,7 +77,7 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* ── NEW: Expiring Soon panel ───────────────────────────────────── */}
+      {/* Expiring soon panel (Phase 3 — unchanged) */}
       {expiringSoon.length > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
           <div className="flex items-center justify-between mb-3">
@@ -146,24 +147,34 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-      {/* ── end new panel ─────────────────────────────────────────────── */}
 
-      {/* Low stock alert (unchanged) */}
+      {/* Phase 4: Low-stock / reorder strip */}
       {lowStock.length > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-          <h2 className="font-semibold text-amber-800 mb-2">
-            ⚠️ Low Stock Items
-          </h2>
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="font-semibold text-red-800">🚨 Reorder Needed</h2>
+            <Link to="/alerts" className="text-xs text-red-700 hover:underline">
+              Manage alerts →
+            </Link>
+          </div>
           <ul className="space-y-1">
-            {lowStock.map((item) => (
+            {lowStock.slice(0, 5).map((item) => (
               <li key={item.id} className="flex justify-between text-sm">
-                <span className="text-gray-700">{item.name}</span>
-                <CautionLevelBadge
-                  stock={item.current_stock}
-                  level={item.caution_level}
-                />
+                <span className="text-gray-700 font-medium">{item.name}</span>
+                <span className="font-mono text-red-600 text-xs">
+                  {Number(item.current_stock).toFixed(2)} /{" "}
+                  {Number(item.caution_level).toFixed(2)} {item.unit}
+                </span>
               </li>
             ))}
+            {lowStock.length > 5 && (
+              <Link
+                to="/alerts"
+                className="block text-xs text-red-700 hover:underline pt-1"
+              >
+                +{lowStock.length - 5} more — view all
+              </Link>
+            )}
           </ul>
         </div>
       )}
