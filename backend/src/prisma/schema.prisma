@@ -1,0 +1,154 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            Int      @id @default(autoincrement())
+  name          String
+  email         String   @unique
+  password_hash String
+  role          Role     @default(staff)
+  createdAt     DateTime @default(now())
+}
+
+enum Role {
+  owner
+  staff
+}
+
+model Vendor {
+  id            Int          @id @default(autoincrement())
+  name          String
+  contact_phone String?
+  contact_email String?
+  address       String?
+  createdAt     DateTime     @default(now())
+  stockBatches  StockBatch[]
+  vendorBills   VendorBill[]
+}
+
+model InventoryItem {
+  id            Int             @id @default(autoincrement())
+  name          String          @unique
+  unit          Unit
+  current_stock Float           @default(0)
+  caution_level Float           @default(0)
+  category      String?
+  createdAt     DateTime        @default(now())
+  stockBatches   StockBatch[]
+  recipeItems    Recipe[]
+  stockMovements StockMovement[]
+  billLineItems  BillLineItem[]
+}
+
+enum Unit {
+  kg
+  L
+  pcs
+  g
+  ml
+}
+
+model StockBatch {
+  id                 Int           @id @default(autoincrement())
+  item               InventoryItem @relation(fields: [item_id], references: [id])
+  item_id            Int
+  vendor             Vendor        @relation(fields: [vendor_id], references: [id])
+  vendor_id          Int
+  quantity_received  Float
+  quantity_remaining Float
+  expiry_date        DateTime?
+  received_date      DateTime      @default(now())
+  unit_price         Float?
+  stockMovements     StockMovement[]
+}
+
+model VendorBill {
+  id                Int            @id @default(autoincrement())
+  vendor            Vendor         @relation(fields: [vendor_id], references: [id])
+  vendor_id         Int
+  bill_number       String?
+  bill_date         DateTime?
+  scanned_image_url String?
+  status            BillStatus     @default(pending)
+  createdAt         DateTime       @default(now())
+  lineItems         BillLineItem[]
+}
+
+enum BillStatus {
+  pending
+  confirmed
+}
+
+model BillLineItem {
+  id              Int            @id @default(autoincrement())
+  bill            VendorBill     @relation(fields: [bill_id], references: [id])
+  bill_id         Int
+  raw_text        String?
+  matched_item    InventoryItem? @relation(fields: [matched_item_id], references: [id])
+  matched_item_id Int?
+  quantity        Float
+  unit_price      Float?
+  expiry_date     DateTime?
+}
+
+model Dish {
+  id             Int             @id @default(autoincrement())
+  name           String          @unique
+  price          Float
+  category       String?
+  createdAt      DateTime        @default(now())
+  recipes        Recipe[]
+  orderLineItems OrderLineItem[]
+}
+
+model Recipe {
+  id                Int           @id @default(autoincrement())
+  dish              Dish          @relation(fields: [dish_id], references: [id])
+  dish_id           Int
+  item              InventoryItem @relation(fields: [item_id], references: [id])
+  item_id           Int
+  quantity_required Float
+  @@unique([dish_id, item_id])
+}
+
+model Order {
+  id                    Int             @id @default(autoincrement())
+  created_at            DateTime        @default(now())
+  total_amount          Float
+  table_or_customer_ref String?
+  lineItems             OrderLineItem[]
+}
+
+model OrderLineItem {
+  id       Int   @id @default(autoincrement())
+  order    Order @relation(fields: [order_id], references: [id])
+  order_id Int
+  dish     Dish  @relation(fields: [dish_id], references: [id])
+  dish_id  Int
+  quantity Int
+}
+
+model StockMovement {
+  id            Int           @id @default(autoincrement())
+  item          InventoryItem @relation(fields: [item_id], references: [id])
+  item_id       Int
+  batch         StockBatch?   @relation(fields: [batch_id], references: [id])
+  batch_id      Int?
+  change_qty    Float
+  movement_type MovementType
+  timestamp     DateTime      @default(now())
+  reference_id  String?
+}
+
+enum MovementType {
+  purchase
+  sale
+  wastage
+  manual_adjustment
+}

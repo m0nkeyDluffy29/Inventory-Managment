@@ -1,6 +1,5 @@
 # backend 
 /backend/node_modules
-/backend/src/prisma
 /uploads
 /backend/.env
 # frontend
