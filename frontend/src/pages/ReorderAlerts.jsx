@@ -6,6 +6,7 @@ import {
   updateCautionLevel,
 } from "../api/inventoryApi";
 import { useAuth } from "../hooks/useAuth";
+import Spinner from "../components/shared/Spinner";
 
 // ── Inline caution-level editor ───────────────────────────────────────────
 
@@ -235,7 +236,7 @@ export default function ReorderAlerts() {
 
       {/* Content */}
       {loading ? (
-        <p className="text-gray-400 text-sm">Loading…</p>
+        <Spinner />
       ) : items.length === 0 ? (
         <div className="bg-green-50 border border-green-200 rounded-xl p-8 text-center">
           <p className="text-4xl mb-2">✅</p>

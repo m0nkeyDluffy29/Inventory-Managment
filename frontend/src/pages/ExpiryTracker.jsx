@@ -5,6 +5,7 @@ import {
   getExpiryStats,
   markBatchWasted,
 } from "../api/inventoryApi";
+import Spinner from "../components/shared/Spinner";
 
 // ── Urgency helpers ────────────────────────────────────────────────────────
 
@@ -191,7 +192,7 @@ export default function ExpiryTracker() {
 
       {/* Batch table */}
       {loading ? (
-        <p className="text-gray-400 text-sm">Loading…</p>
+        <Spinner /> // ← ADD
       ) : batches.length === 0 ? (
         <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center text-green-700">
           <p className="text-2xl mb-1">✅</p>

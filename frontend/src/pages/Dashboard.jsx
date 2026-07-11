@@ -17,6 +17,7 @@ import {
 import CautionLevelBadge from "../components/inventory/CautionLevelBadge";
 import { format, differenceInDays, isPast, isToday } from "date-fns";
 import { Link } from "react-router-dom";
+import Spinner from "../components/shared/Spinner"; // ← ADD
 
 export default function Dashboard() {
   const [items, setItems] = useState([]);
@@ -24,13 +25,19 @@ export default function Dashboard() {
   const [lowStock, setLowStock] = useState([]);
   const [expiringSoon, setExpiringSoon] = useState([]);
   const [expiryStats, setExpiryStats] = useState(null);
+  const [loading, setLoading] = useState(true); // ← ADD
 
   useEffect(() => {
-    getItems().then(setItems).catch(console.error);
-    getOrders().then(setOrders).catch(console.error);
-    getLowStockItems().then(setLowStock).catch(console.error);
-    getExpiringSoon(3).then(setExpiringSoon).catch(console.error);
-    getExpiryStats().then(setExpiryStats).catch(console.error);
+    // ← REPLACE the existing useEffect with this
+    Promise.all([
+      getItems().then(setItems),
+      getOrders().then(setOrders),
+      getLowStockItems().then(setLowStock),
+      getExpiringSoon(3).then(setExpiringSoon),
+      getExpiryStats().then(setExpiryStats),
+    ])
+      .catch(console.error)
+      .finally(() => setLoading(false)); // ← turns off spinner when ALL calls finish
   }, []);
 
   const topItems = [...items]
@@ -39,11 +46,14 @@ export default function Dashboard() {
   const urgentExpiry =
     (expiryStats?.alreadyExpired || 0) + (expiryStats?.expiringToday || 0);
 
+  // ← ADD this block right after state declarations
+  if (loading) return <Spinner />;
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
 
-      {/* KPI Cards — Phase 4: 4th card = Need Reorder */}
+      {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: "Total Items", value: items.length, warn: false },
@@ -61,7 +71,7 @@ export default function Dashboard() {
             label: "Need Reorder",
             value: lowStock.length,
             warn: lowStock.length > 0,
-          }, // ← Phase 4
+          },
         ].map((card) => (
           <div
             key={card.label}
@@ -77,7 +87,7 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Expiring soon panel (Phase 3 — unchanged) */}
+      {/* Expiring soon panel */}
       {expiringSoon.length > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
           <div className="flex items-center justify-between mb-3">
@@ -148,7 +158,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Phase 4: Low-stock / reorder strip */}
+      {/* Reorder strip */}
       {lowStock.length > 0 && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-4">
           <div className="flex items-center justify-between mb-2">
@@ -179,7 +189,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Stock chart (unchanged) */}
+      {/* Stock chart */}
       <div className="bg-white border border-gray-200 rounded-xl p-5">
         <h2 className="font-semibold text-gray-700 mb-4">
           Stock Levels (Top 8)

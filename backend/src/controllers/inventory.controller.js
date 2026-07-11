@@ -1,16 +1,19 @@
-const { PrismaClient } = require("@prisma/client");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { z } = require("zod");
 const { markBatchWasted } = require("../services/expiry.service");
-const prisma = new PrismaClient();
+const prisma = require("../lib/prisma");
 
 // ── Auth ──────────────────────────────────────
 
 const registerSchema = z.object({
   name: z.string().min(1),
   email: z.string().email(),
-  password: z.string().min(6),
+  password: z
+    .string()
+    .min(8, "Password must be at least 8 characters")
+    .regex(/[A-Z]/, "Must contain at least one uppercase letter")
+    .regex(/[0-9]/, "Must contain at least one number"),
   role: z.enum(["owner", "staff"]).optional(),
 });
 

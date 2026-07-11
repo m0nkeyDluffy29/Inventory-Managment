@@ -1,9 +1,8 @@
-const { PrismaClient } = require('@prisma/client');
 const { z } = require('zod');
 const { runReorderAlert }                  = require('../jobs/reorderAlert.job');
 const { sendTestEmail: sendTestEmailSvc }  = require('../services/email.service');
 
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma') 
 
 // GET /api/alerts/low-stock
 // Returns items where current_stock < caution_level, sorted by deficit descending

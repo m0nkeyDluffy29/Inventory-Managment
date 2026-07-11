@@ -1,84 +1,79 @@
-const { PrismaClient } = require("@prisma/client");
 const { z } = require("zod");
-const { deductStockFIFO } = require("../services/stockDeduction.service");
+const prisma = require("../lib/prisma");
 
-const prisma = new PrismaClient();
-
-const orderSchema = z.object({
-  table_or_customer_ref: z.string().optional(),
-  lineItems: z
-    .array(
-      z.object({
-        dish_id: z.number().int(),
-        quantity: z.number().int().positive(),
-      }),
-    )
-    .min(1),
+const dishSchema = z.object({
+  name: z.string().min(1),
+  price: z.number().positive(),
+  category: z.string().optional(),
 });
 
-exports.listOrders = async (_req, res, next) => {
+exports.listDishes = async (_req, res, next) => {
   try {
-    res.json(
-      await prisma.order.findMany({
-        include: { lineItems: { include: { dish: true } } },
-        orderBy: { created_at: "desc" },
-      }),
-    );
+    res.json(await prisma.dish.findMany({ orderBy: { name: "asc" } }));
   } catch (err) {
     next(err);
   }
 };
-
-exports.createOrder = async (req, res, next) => {
+exports.createDish = async (req, res, next) => {
   try {
-    const data = orderSchema.parse(req.body);
-    const dishIds = data.lineItems.map((l) => l.dish_id);
-    const dishes = await prisma.dish.findMany({
-      where: { id: { in: dishIds } },
-      include: { recipes: { include: { item: true } } },
-    });
-    if (dishes.length !== new Set(dishIds).size)
-      return res.status(400).json({ error: "One or more dish IDs not found" });
-
-    const total_amount = data.lineItems.reduce((sum, li) => {
-      const dish = dishes.find((d) => d.id === li.dish_id);
-      return sum + dish.price * li.quantity;
-    }, 0);
-
-    const order = await prisma.$transaction(async (tx) => {
-      const newOrder = await tx.order.create({
-        data: {
-          total_amount,
-          table_or_customer_ref: data.table_or_customer_ref,
-          lineItems: { create: data.lineItems },
-        },
-      });
-      for (const li of data.lineItems) {
-        const dish = dishes.find((d) => d.id === li.dish_id);
-        await deductStockFIFO(tx, dish, li.quantity, newOrder.id);
-      }
-      return newOrder;
-    });
-
-    res.status(201).json(
-      await prisma.order.findUnique({
-        where: { id: order.id },
-        include: { lineItems: { include: { dish: true } } },
-      }),
-    );
+    res
+      .status(201)
+      .json(await prisma.dish.create({ data: dishSchema.parse(req.body) }));
   } catch (err) {
     next(err);
   }
 };
-
-exports.getOrder = async (req, res, next) => {
+exports.updateDish = async (req, res, next) => {
   try {
     res.json(
-      await prisma.order.findUniqueOrThrow({
+      await prisma.dish.update({
         where: { id: +req.params.id },
-        include: { lineItems: { include: { dish: true } } },
+        data: dishSchema.partial().parse(req.body),
       }),
     );
+  } catch (err) {
+    next(err);
+  }
+};
+exports.deleteDish = async (req, res, next) => {
+  try {
+    await prisma.dish.delete({ where: { id: +req.params.id } });
+    res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+};
+exports.getRecipe = async (req, res, next) => {
+  try {
+    res.json(
+      await prisma.recipe.findMany({
+        where: { dish_id: +req.params.id },
+        include: { item: true },
+      }),
+    );
+  } catch (err) {
+    next(err);
+  }
+};
+
+const recipeSchema = z.array(
+  z.object({
+    item_id: z.number().int(),
+    quantity_required: z.number().positive(),
+  }),
+);
+
+exports.setRecipe = async (req, res, next) => {
+  try {
+    const lines = recipeSchema.parse(req.body);
+    const dish_id = +req.params.id;
+    const result = await prisma.$transaction(async (tx) => {
+      await tx.recipe.deleteMany({ where: { dish_id } });
+      return tx.recipe.createMany({
+        data: lines.map((l) => ({ dish_id, ...l })),
+      });
+    });
+    res.json(result);
   } catch (err) {
     next(err);
   }

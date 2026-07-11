@@ -1,9 +1,9 @@
-const { PrismaClient } = require("@prisma/client");
+
 const { z } = require("zod");
 const { extractLineItemsFromImage } = require("../services/ocr.service"); // ← changed
 const { matchOCRLinesToItems } = require("../services/itemMatcher.service"); // ← changed
 
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma') 
 
 // ── unchanged: listBills, getBill, createBill, confirmBill ──
 

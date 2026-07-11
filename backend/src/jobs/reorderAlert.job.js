@@ -1,7 +1,6 @@
-const { PrismaClient } = require("@prisma/client");
 const { sendReorderAlert } = require("../services/email.service");
 
-const prisma = new PrismaClient();
+const prisma = require("../lib/prisma");
 
 /**
  * Fetch all InventoryItems where current_stock < caution_level,

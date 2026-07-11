@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, Link } from "react-router-dom"; // ← add Link here
 import { useAuth } from "./hooks/useAuth";
 import Navbar from "./components/shared/Navbar";
 import Dashboard from "./pages/Dashboard";
@@ -35,6 +35,25 @@ export default function App() {
                     <Route path="/recipes" element={<Recipes />} />
                     <Route path="/expiry" element={<ExpiryTracker />} />
                     <Route path="/alerts" element={<ReorderAlerts />} />
+
+                    {/* ← ADD this as the last route */}
+                    <Route
+                      path="*"
+                      element={
+                        <div className="text-center py-20">
+                          <p className="text-4xl mb-3">🔍</p>
+                          <h2 className="text-xl font-bold text-gray-700">
+                            Page not found
+                          </h2>
+                          <Link
+                            to="/"
+                            className="text-indigo-600 hover:underline text-sm mt-2 block"
+                          >
+                            ← Back to Dashboard
+                          </Link>
+                        </div>
+                      }
+                    />
                   </Routes>
                 </main>
               </div>

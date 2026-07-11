@@ -1,8 +1,8 @@
-const { PrismaClient } = require('@prisma/client');
+
 const { z } = require('zod');
 const { deductStockFIFO } = require('../services/stockDeduction.service');
 
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma') 
 
 const orderSchema = z.object({
   table_or_customer_ref: z.string().optional(),

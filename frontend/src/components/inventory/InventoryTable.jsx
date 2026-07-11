@@ -2,7 +2,15 @@ import CautionLevelBadge from "./CautionLevelBadge";
 
 export default function InventoryTable({ items, onEdit, onDelete }) {
   if (!items?.length)
-    return <p className="text-gray-500 text-sm">No inventory items found.</p>;
+    return (
+      <div className="text-center py-16 border-2 border-dashed border-gray-200 rounded-xl">
+        <p className="text-4xl mb-2">📦</p>
+        <p className="font-medium text-gray-600">No inventory items yet</p>
+        <p className="text-sm text-gray-400 mt-1">
+          Click "+ Add Item" to add your first ingredient.
+        </p>
+      </div>
+    );
   return (
     <div className="overflow-x-auto rounded-lg border border-gray-200">
       <table className="w-full text-sm">
