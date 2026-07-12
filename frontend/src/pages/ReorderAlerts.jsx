@@ -6,9 +6,16 @@ import {
   updateCautionLevel,
 } from "../api/inventoryApi";
 import { useAuth } from "../hooks/useAuth";
-import Spinner from "../components/shared/Spinner";
 
-// ── Inline caution-level editor ───────────────────────────────────────────
+function Toast({ msg, type }) {
+  return msg ? (
+    <div
+      className={`toast ${type === "success" ? "toast-success" : "toast-error"}`}
+    >
+      {msg}
+    </div>
+  ) : null;
+}
 
 function CautionEditor({ item, onSaved }) {
   const [editing, setEditing] = useState(false);
@@ -31,38 +38,72 @@ function CautionEditor({ item, onSaved }) {
     }
   };
 
-  if (!editing) {
+  if (!editing)
     return (
-      <div className="flex items-center gap-2">
-        <span className="font-mono">{item.caution_level}</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span
+          style={{ fontFamily: "monospace", fontSize: 14, fontWeight: 600 }}
+        >
+          {Number(item.caution_level).toFixed(1)}
+        </span>
         <button
           onClick={() => {
             setValue(item.caution_level);
             setEditing(true);
           }}
-          className="text-xs text-indigo-600 hover:underline"
+          style={{
+            background: "#EDE9E3",
+            border: "none",
+            borderRadius: 6,
+            padding: "3px 10px",
+            cursor: "pointer",
+            fontSize: 11,
+            fontWeight: 600,
+            color: "#1C1917",
+          }}
         >
           Edit
         </button>
       </div>
     );
-  }
 
   return (
-    <div className="flex items-center gap-1">
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        flexWrap: "wrap",
+      }}
+    >
       <input
         type="number"
         min="0"
         step="0.1"
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        className="w-20 border rounded px-2 py-0.5 text-sm"
         autoFocus
+        style={{
+          width: 70,
+          padding: "5px 8px",
+          border: "1.5px solid #F59E0B",
+          borderRadius: 8,
+          fontSize: 13,
+          fontFamily: "monospace",
+        }}
       />
       <button
         onClick={handleSave}
         disabled={saving}
-        className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700 disabled:opacity-50"
+        style={{
+          background: "#F59E0B",
+          border: "none",
+          borderRadius: 8,
+          padding: "5px 12px",
+          cursor: "pointer",
+          fontSize: 12,
+          fontWeight: 700,
+        }}
       >
         {saving ? "…" : "Save"}
       </button>
@@ -71,16 +112,20 @@ function CautionEditor({ item, onSaved }) {
           setEditing(false);
           setErr("");
         }}
-        className="text-xs text-gray-500 hover:underline"
+        style={{
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          color: "#A8A29E",
+          fontSize: 13,
+        }}
       >
         Cancel
       </button>
-      {err && <span className="text-xs text-red-600">{err}</span>}
+      {err && <span style={{ fontSize: 11, color: "#C2410C" }}>{err}</span>}
     </div>
   );
 }
-
-// ── Main page ─────────────────────────────────────────────────────────────
 
 export default function ReorderAlerts() {
   const { user } = useAuth();
@@ -90,14 +135,12 @@ export default function ReorderAlerts() {
   const [loading, setLoading] = useState(true);
   const [triggering, setTriggering] = useState(false);
   const [testingEmail, setTestingEmail] = useState(false);
-  const [toastMsg, setToastMsg] = useState("");
-  const [toastType, setToastType] = useState("success"); // 'success' | 'error'
+  const [toast, setToast] = useState({ msg: "", type: "success" });
   const [lastTriggered, setLastTriggered] = useState(null);
 
   const showToast = (msg, type = "success") => {
-    setToastMsg(msg);
-    setToastType(type);
-    setTimeout(() => setToastMsg(""), 4000);
+    setToast({ msg, type });
+    setTimeout(() => setToast({ msg: "", type: "success" }), 4000);
   };
 
   const load = useCallback(async () => {
@@ -105,7 +148,7 @@ export default function ReorderAlerts() {
     try {
       const data = await getLowStockItems();
       setItems(data);
-    } catch (err) {
+    } catch {
       showToast("Failed to load low-stock items.", "error");
     } finally {
       setLoading(false);
@@ -116,23 +159,16 @@ export default function ReorderAlerts() {
     load();
   }, [load]);
 
-  // Manual trigger
   const handleTrigger = async () => {
     setTriggering(true);
     try {
       const result = await triggerReorderAlert();
       setLastTriggered(new Date());
-      if (result.count === 0) {
-        showToast(
-          "All items are above caution level — no email sent.",
-          "success",
-        );
-      } else {
-        showToast(
-          `✅ Reorder alert sent for ${result.count} item(s)!`,
-          "success",
-        );
-      }
+      showToast(
+        result.count === 0
+          ? "All items above caution level — no email sent."
+          : `✅ Reorder alert sent for ${result.count} item(s)!`,
+      );
     } catch (err) {
       showToast(err.response?.data?.error || "Failed to send alert.", "error");
     } finally {
@@ -140,66 +176,61 @@ export default function ReorderAlerts() {
     }
   };
 
-  // SMTP test
   const handleTestEmail = async () => {
     setTestingEmail(true);
     try {
       await sendTestEmail();
-      showToast("✅ Test email sent — check your inbox.", "success");
+      showToast("✅ Test email sent — check your inbox.");
     } catch (err) {
-      showToast(
-        err.response?.data?.error || "SMTP test failed — check .env settings.",
-        "error",
-      );
+      showToast(err.response?.data?.error || "SMTP test failed.", "error");
     } finally {
       setTestingEmail(false);
     }
   };
 
+  const totalDeficit = items.reduce(
+    (s, i) => s + Math.max(0, (i.caution_level || 0) - (i.current_stock || 0)),
+    0,
+  );
+
   return (
-    <div className="space-y-6">
-      {/* Toast */}
-      {toastMsg && (
-        <div
-          className={`fixed top-4 right-4 z-50 px-5 py-3 rounded-xl shadow-lg text-sm font-medium transition-all ${
-            toastType === "success"
-              ? "bg-green-600 text-white"
-              : "bg-red-600 text-white"
-          }`}
-        >
-          {toastMsg}
-        </div>
-      )}
+    <div>
+      <Toast msg={toast.msg} type={toast.type} />
 
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">Reorder Alerts</h1>
-          <p className="text-gray-500 text-sm mt-1">
-            Items below their caution level. Weekly email fires automatically
-            every Sunday at 8 PM.
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          marginBottom: 24,
+        }}
+      >
+        <div className="page-header" style={{ marginBottom: 0 }}>
+          <h1>Reorder Alerts</h1>
+          <p>
+            Items below their caution level.
+            {lastTriggered && (
+              <span style={{ color: "#F59E0B", marginLeft: 6 }}>
+                Last sent: {lastTriggered.toLocaleTimeString()}
+              </span>
+            )}
           </p>
-          {lastTriggered && (
-            <p className="text-xs text-indigo-600 mt-1">
-              Last manually triggered: {lastTriggered.toLocaleTimeString()}
-            </p>
-          )}
         </div>
-
-        {/* Owner-only actions */}
         {isOwner && (
-          <div className="flex gap-2 shrink-0">
+          <div style={{ display: "flex", gap: 10 }}>
             <button
               onClick={handleTestEmail}
               disabled={testingEmail}
-              className="text-sm border border-gray-300 text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              className="btn-ghost"
             >
               {testingEmail ? "Sending…" : "📧 Test Email"}
             </button>
             <button
               onClick={handleTrigger}
               disabled={triggering || items.length === 0}
-              className="text-sm bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium"
+              className="btn-primary"
+              style={{ opacity: items.length === 0 ? 0.4 : 1 }}
             >
               {triggering ? "Sending…" : "🚨 Send Alert Now"}
             </button>
@@ -207,115 +238,219 @@ export default function ReorderAlerts() {
         )}
       </div>
 
-      {/* Weekly schedule info card */}
-      <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 flex items-start gap-3">
-        <span className="text-2xl">🗓</span>
+      {/* Info card */}
+      <div
+        className="card"
+        style={{
+          display: "flex",
+          gap: 16,
+          alignItems: "flex-start",
+          marginBottom: 24,
+          borderLeft: "4px solid #1C1917",
+        }}
+      >
+        <div style={{ fontSize: 28, flexShrink: 0 }}>🗓</div>
         <div>
-          <p className="text-sm font-semibold text-indigo-800">
+          <div
+            style={{
+              fontFamily: "Playfair Display, serif",
+              fontSize: 17,
+              fontWeight: 700,
+              marginBottom: 4,
+            }}
+          >
             Automatic Weekly Email
-          </p>
-          <p className="text-sm text-indigo-700 mt-0.5">
-            Every <strong>Sunday at 8:00 PM</strong>, the system compares
-            current stock against each item's caution level and emails the owner
-            a formatted reorder list — automatically. Use "Send Alert Now" to
-            trigger it immediately at any time.
-          </p>
+          </div>
+          <div style={{ fontSize: 14, color: "#78716C", lineHeight: 1.6 }}>
+            Every <strong>Sunday at 8:00 PM</strong>, the system emails the
+            owner a formatted reorder list for all items below caution level.
+            {isOwner && ' Use "Send Alert Now" to trigger it immediately.'}
+          </div>
         </div>
       </div>
 
-      {/* Refresh */}
-      <div className="flex justify-end">
-        <button
-          onClick={load}
-          disabled={loading}
-          className="text-sm text-indigo-600 hover:underline disabled:opacity-40"
-        >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          marginBottom: 16,
+        }}
+      >
+        <button onClick={load} disabled={loading} className="btn-ghost">
           {loading ? "Refreshing…" : "↻ Refresh"}
         </button>
       </div>
 
-      {/* Content */}
       {loading ? (
-        <Spinner />
+        <div className="spinner-wrap">
+          <div className="spinner" />
+        </div>
       ) : items.length === 0 ? (
-        <div className="bg-green-50 border border-green-200 rounded-xl p-8 text-center">
-          <p className="text-4xl mb-2">✅</p>
-          <p className="font-semibold text-green-700">
-            All items are above their caution level!
-          </p>
-          <p className="text-sm text-green-600 mt-1">
-            No reorder email will be sent this week.
+        <div className="empty-state">
+          <div className="empty-icon">✅</div>
+          <h3>All items are above their caution level</h3>
+          <p>
+            No reorder email will be sent this week. Great job keeping stock
+            levels up!
           </p>
         </div>
       ) : (
         <>
-          {/* Summary strip */}
-          <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-3 flex items-center justify-between">
-            <p className="text-amber-800 font-semibold">
-              ⚠️ {items.length} item{items.length > 1 ? "s" : ""} need
-              restocking
-            </p>
-            <p className="text-amber-700 text-sm">
-              Total deficit:{" "}
-              {items.reduce((s, i) => s + (i.deficit || 0), 0).toFixed(2)} units
-              across all items
-            </p>
+          {/* Summary */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 14,
+              marginBottom: 20,
+            }}
+          >
+            <div
+              className="card"
+              style={{ borderTop: "3px solid #C2410C", padding: "16px 20px" }}
+            >
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: "#78716C",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                }}
+              >
+                Items to Reorder
+              </div>
+              <div
+                style={{
+                  fontSize: 36,
+                  fontWeight: 700,
+                  fontFamily: "Playfair Display, serif",
+                  color: "#C2410C",
+                  marginTop: 4,
+                }}
+              >
+                {items.length}
+              </div>
+            </div>
+            <div
+              className="card"
+              style={{ borderTop: "3px solid #D97706", padding: "16px 20px" }}
+            >
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: "#78716C",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                }}
+              >
+                Total Units Deficit
+              </div>
+              <div
+                style={{
+                  fontSize: 36,
+                  fontWeight: 700,
+                  fontFamily: "Playfair Display, serif",
+                  color: "#D97706",
+                  marginTop: 4,
+                }}
+              >
+                {totalDeficit.toFixed(1)}
+              </div>
+            </div>
           </div>
 
           {/* Table */}
-          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-gray-600 uppercase text-xs">
+          <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+            <table className="data-table">
+              <thead>
                 <tr>
-                  <th className="px-4 py-3 text-left">Item</th>
-                  <th className="px-4 py-3 text-left">Category</th>
-                  <th className="px-4 py-3 text-right">Current Stock</th>
-                  <th className="px-4 py-3 text-right">Caution Level</th>
-                  <th className="px-4 py-3 text-right">Deficit</th>
-                  <th className="px-4 py-3 text-right">Unit</th>
-                  {isOwner && (
-                    <th className="px-4 py-3 text-left">Edit Caution</th>
-                  )}
+                  <th>Item</th>
+                  <th>Category</th>
+                  <th style={{ textAlign: "right" }}>Current Stock</th>
+                  <th style={{ textAlign: "right" }}>Caution Level</th>
+                  <th style={{ textAlign: "right" }}>Deficit</th>
+                  <th style={{ textAlign: "right" }}>Unit</th>
+                  {isOwner && <th>Edit Threshold</th>}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
-                {items.map((item) => (
-                  <tr key={item.id} className="hover:bg-amber-50">
-                    <td className="px-4 py-3 font-semibold text-gray-800">
-                      {item.name}
-                    </td>
-                    <td className="px-4 py-3 text-gray-500">
-                      {item.category || "—"}
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono text-red-600 font-bold">
-                      {Number(item.current_stock).toFixed(2)}
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono text-gray-600">
-                      {Number(item.caution_level).toFixed(2)}
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono font-bold text-amber-700">
-                      -
-                      {Number(
-                        item.deficit || item.caution_level - item.current_stock,
-                      ).toFixed(2)}
-                    </td>
-                    <td className="px-4 py-3 text-right text-gray-500">
-                      {item.unit}
-                    </td>
-                    {isOwner && (
-                      <td className="px-4 py-3">
-                        <CautionEditor item={item} onSaved={load} />
+              <tbody>
+                {items.map((item) => {
+                  const deficit = Math.max(
+                    0,
+                    (item.caution_level || 0) - (item.current_stock || 0),
+                  );
+                  return (
+                    <tr key={item.id}>
+                      <td style={{ fontWeight: 700, color: "#1C1917" }}>
+                        {item.name}
                       </td>
-                    )}
-                  </tr>
-                ))}
+                      <td>
+                        {item.category ? (
+                          <span className="badge badge-blue">
+                            {item.category}
+                          </span>
+                        ) : (
+                          <span style={{ color: "#A8A29E" }}>—</span>
+                        )}
+                      </td>
+                      <td
+                        style={{
+                          textAlign: "right",
+                          fontFamily: "monospace",
+                          fontWeight: 700,
+                          color: "#C2410C",
+                          fontSize: 15,
+                        }}
+                      >
+                        {Number(item.current_stock).toFixed(2)}
+                      </td>
+                      <td
+                        style={{
+                          textAlign: "right",
+                          fontFamily: "monospace",
+                          color: "#78716C",
+                        }}
+                      >
+                        {Number(item.caution_level).toFixed(2)}
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        <span className="badge badge-red">
+                          -{deficit.toFixed(2)}
+                        </span>
+                      </td>
+                      <td
+                        style={{
+                          textAlign: "right",
+                          color: "#78716C",
+                          fontSize: 13,
+                        }}
+                      >
+                        {item.unit}
+                      </td>
+                      {isOwner && (
+                        <td>
+                          <CautionEditor item={item} onSaved={load} />
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
           {!isOwner && (
-            <p className="text-xs text-gray-400 text-center">
-              Only owners can edit caution levels or trigger email alerts.
+            <p
+              style={{
+                fontSize: 12,
+                color: "#A8A29E",
+                textAlign: "center",
+                marginTop: 12,
+              }}
+            >
+              Contact the owner to edit caution levels or trigger email alerts.
             </p>
           )}
         </>

@@ -5,9 +5,6 @@ import {
   getExpiryStats,
   markBatchWasted,
 } from "../api/inventoryApi";
-import Spinner from "../components/shared/Spinner";
-
-// ── Urgency helpers ────────────────────────────────────────────────────────
 
 function urgencyLevel(expiryDate) {
   if (!expiryDate) return "none";
@@ -19,51 +16,78 @@ function urgencyLevel(expiryDate) {
   return "soon";
 }
 
-const URGENCY_STYLES = {
+const URGENCY = {
   expired: {
-    row: "bg-red-50",
-    badge: "bg-red-100 text-red-700",
+    bg: "#FEF2F2",
+    badge: "badge-red",
     label: "💀 Expired",
+    row: "#FEF2F2",
   },
   today: {
-    row: "bg-red-50",
-    badge: "bg-red-100 text-red-700",
+    bg: "#FEF2F2",
+    badge: "badge-red",
     label: "🔴 Today",
+    row: "#FEF2F2",
   },
   critical: {
-    row: "bg-amber-50",
-    badge: "bg-amber-100 text-amber-700",
+    bg: "#FFFBEB",
+    badge: "badge-amber",
     label: "🟠 ≤ 3 days",
+    row: "#FFFBEB",
   },
   soon: {
-    row: "bg-yellow-50",
-    badge: "bg-yellow-100 text-yellow-700",
+    bg: "#FEFCE8",
+    badge: "badge-amber",
     label: "🟡 This week",
+    row: "#FEFCE8",
   },
-  none: { row: "", badge: "bg-gray-100 text-gray-500", label: "No expiry" },
+  none: { bg: "#fff", badge: "badge-gray", label: "No expiry", row: "#fff" },
 };
 
-// ── Stat card ──────────────────────────────────────────────────────────────
-
-function StatCard({ label, value, colour }) {
+function StatCard({ label, value, colour, icon }) {
   return (
-    <div className={`rounded-xl p-4 border ${colour}`}>
-      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+    <div
+      style={{
+        background: "#fff",
+        border: `1px solid ${colour.border}`,
+        borderRadius: 14,
+        padding: "18px 20px",
+        borderTop: `3px solid ${colour.top}`,
+      }}
+    >
+      <div style={{ fontSize: 22, marginBottom: 8 }}>{icon}</div>
+      <div
+        style={{
+          fontSize: 30,
+          fontWeight: 700,
+          fontFamily: "Playfair Display, serif",
+          color: colour.val,
+        }}
+      >
+        {value ?? "—"}
+      </div>
+      <div
+        style={{
+          fontSize: 12,
+          color: "#78716C",
+          marginTop: 4,
+          fontWeight: 600,
+          textTransform: "uppercase",
+          letterSpacing: "0.05em",
+        }}
+      >
         {label}
-      </p>
-      <p className="text-3xl font-bold mt-1">{value ?? "—"}</p>
+      </div>
     </div>
   );
 }
-
-// ── Main page ──────────────────────────────────────────────────────────────
 
 export default function ExpiryTracker() {
   const [batches, setBatches] = useState([]);
   const [stats, setStats] = useState(null);
   const [days, setDays] = useState(7);
   const [loading, setLoading] = useState(true);
-  const [wasting, setWasting] = useState(null); // batchId currently being wasted
+  const [wasting, setWasting] = useState(null);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
@@ -76,9 +100,8 @@ export default function ExpiryTracker() {
       ]);
       setBatches(b);
       setStats(s);
-    } catch (err) {
+    } catch {
       setError("Failed to load expiry data.");
-      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -88,7 +111,7 @@ export default function ExpiryTracker() {
     load();
   }, [load]);
 
-  const handleMarkWasted = async (batch) => {
+  const handleWaste = async (batch) => {
     if (
       !confirm(
         `Write off ${batch.quantity_remaining} ${batch.item.unit} of "${batch.item.name}" as wastage?`,
@@ -108,164 +131,218 @@ export default function ExpiryTracker() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-800">
-          📦 Use First — Expiry Tracker
-        </h1>
-        <button
-          onClick={load}
-          disabled={loading}
-          className="text-sm text-indigo-600 hover:underline disabled:opacity-40"
-        >
+    <div>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          marginBottom: 28,
+        }}
+      >
+        <div className="page-header" style={{ marginBottom: 0 }}>
+          <h1>Expiry Tracker</h1>
+          <p>
+            Use oldest stock first — FIFO deduction is always active on orders.
+          </p>
+        </div>
+        <button onClick={load} disabled={loading} className="btn-ghost">
           {loading ? "Refreshing…" : "↻ Refresh"}
         </button>
       </div>
 
-      {/* Stats cards */}
+      {/* Stats */}
       {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(4, 1fr)",
+            gap: 14,
+            marginBottom: 24,
+          }}
+        >
           <StatCard
             label="Already Expired"
             value={stats.alreadyExpired}
+            icon="💀"
             colour={
               stats.alreadyExpired > 0
-                ? "bg-red-50 border-red-200"
-                : "bg-white border-gray-200"
+                ? { border: "#FECACA", top: "#C2410C", val: "#C2410C" }
+                : { border: "#E7E0D5", top: "#A8A29E", val: "#1C1917" }
             }
           />
           <StatCard
             label="Expiring Today"
             value={stats.expiringToday}
+            icon="🔴"
             colour={
               stats.expiringToday > 0
-                ? "bg-red-50 border-red-200"
-                : "bg-white border-gray-200"
+                ? { border: "#FECACA", top: "#C2410C", val: "#C2410C" }
+                : { border: "#E7E0D5", top: "#A8A29E", val: "#1C1917" }
             }
           />
           <StatCard
             label="Within 3 Days"
             value={stats.expiringIn3Days}
+            icon="🟠"
             colour={
               stats.expiringIn3Days > 0
-                ? "bg-amber-50 border-amber-200"
-                : "bg-white border-gray-200"
+                ? { border: "#FDE68A", top: "#D97706", val: "#92400E" }
+                : { border: "#E7E0D5", top: "#A8A29E", val: "#1C1917" }
             }
           />
           <StatCard
             label="Within 7 Days"
             value={stats.expiringIn7Days}
+            icon="🟡"
             colour={
               stats.expiringIn7Days > 0
-                ? "bg-yellow-50 border-yellow-200"
-                : "bg-white border-gray-200"
+                ? { border: "#FDE68A", top: "#D97706", val: "#92400E" }
+                : { border: "#E7E0D5", top: "#A8A29E", val: "#1C1917" }
             }
           />
         </div>
       )}
 
-      {/* Day filter */}
-      <div className="flex items-center gap-3">
-        <span className="text-sm text-gray-600">
+      {/* Filter */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          marginBottom: 20,
+        }}
+      >
+        <span style={{ fontSize: 13, color: "#78716C", fontWeight: 500 }}>
           Show batches expiring within:
         </span>
         {[3, 7, 14, 30].map((d) => (
           <button
             key={d}
             onClick={() => setDays(d)}
-            className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-              days === d
-                ? "bg-indigo-600 text-white"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }`}
+            style={{
+              padding: "6px 16px",
+              borderRadius: 999,
+              fontSize: 13,
+              fontWeight: 600,
+              border: "none",
+              cursor: "pointer",
+              transition: "all 0.15s",
+              background: days === d ? "#1C1917" : "#F5F0E8",
+              color: days === d ? "#F59E0B" : "#78716C",
+            }}
           >
-            {d} days
+            {d}d
           </button>
         ))}
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-700 text-sm">
-          {error}
+        <div className="alert-strip alert-red" style={{ marginBottom: 16 }}>
+          ⚠️ {error}
         </div>
       )}
 
-      {/* Batch table */}
       {loading ? (
-        <Spinner /> // ← ADD
+        <div className="spinner-wrap">
+          <div className="spinner" />
+        </div>
       ) : batches.length === 0 ? (
-        <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center text-green-700">
-          <p className="text-2xl mb-1">✅</p>
-          <p className="font-medium">No batches expiring within {days} days.</p>
-          <p className="text-sm mt-1">
-            FIFO deduction is already pulling oldest stock first.
+        <div className="empty-state">
+          <div className="empty-icon">✅</div>
+          <h3>No batches expiring within {days} days</h3>
+          <p>
+            Your stock is fresh. FIFO is pulling from the oldest batches
+            automatically.
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-gray-200">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-gray-600 uppercase text-xs">
+        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+          <table className="data-table">
+            <thead>
               <tr>
-                <th className="px-4 py-3 text-left">Item</th>
-                <th className="px-4 py-3 text-left">Vendor</th>
-                <th className="px-4 py-3 text-right">Remaining</th>
-                <th className="px-4 py-3 text-right">Unit</th>
-                <th className="px-4 py-3 text-left">Expiry Date</th>
-                <th className="px-4 py-3 text-left">Status</th>
-                <th className="px-4 py-3 text-right">Action</th>
+                <th>Item</th>
+                <th>Vendor</th>
+                <th style={{ textAlign: "right" }}>Remaining</th>
+                <th style={{ textAlign: "right" }}>Unit</th>
+                <th>Expiry Date</th>
+                <th>Status</th>
+                <th style={{ textAlign: "right" }}>Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody>
               {batches.map((batch) => {
                 const urgency = urgencyLevel(batch.expiry_date);
-                const style = URGENCY_STYLES[urgency];
+                const style = URGENCY[urgency];
                 const daysLeft = batch.expiry_date
                   ? differenceInDays(new Date(batch.expiry_date), new Date())
                   : null;
-
                 return (
-                  <tr key={batch.id} className={style.row}>
-                    <td className="px-4 py-3 font-medium text-gray-800">
+                  <tr key={batch.id} style={{ background: style.row }}>
+                    <td style={{ fontWeight: 600, color: "#1C1917" }}>
                       {batch.item?.name}
                     </td>
-                    <td className="px-4 py-3 text-gray-500">
+                    <td style={{ color: "#78716C" }}>
                       {batch.vendor?.name || "—"}
                     </td>
-                    <td className="px-4 py-3 text-right font-mono font-semibold">
+                    <td
+                      style={{
+                        textAlign: "right",
+                        fontFamily: "monospace",
+                        fontWeight: 700,
+                        fontSize: 15,
+                      }}
+                    >
                       {batch.quantity_remaining}
                     </td>
-                    <td className="px-4 py-3 text-right text-gray-500">
+                    <td
+                      style={{
+                        textAlign: "right",
+                        color: "#78716C",
+                        fontSize: 13,
+                      }}
+                    >
                       {batch.item?.unit}
                     </td>
-                    <td className="px-4 py-3">
-                      {batch.expiry_date
-                        ? format(new Date(batch.expiry_date), "dd MMM yyyy")
-                        : "—"}
+                    <td>
+                      <div style={{ fontWeight: 500 }}>
+                        {batch.expiry_date
+                          ? format(new Date(batch.expiry_date), "dd MMM yyyy")
+                          : "—"}
+                      </div>
                       {daysLeft !== null && (
-                        <span className="ml-2 text-xs text-gray-400">
+                        <div
+                          style={{
+                            fontSize: 11,
+                            color: "#A8A29E",
+                            marginTop: 2,
+                          }}
+                        >
                           {daysLeft < 0
-                            ? `(${Math.abs(daysLeft)}d ago)`
+                            ? `${Math.abs(daysLeft)}d ago`
                             : daysLeft === 0
-                              ? "(today)"
-                              : `(in ${daysLeft}d)`}
-                        </span>
+                              ? "today"
+                              : `in ${daysLeft}d`}
+                        </div>
                       )}
                     </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${style.badge}`}
-                      >
+                    <td>
+                      <span className={`badge ${style.badge}`}>
                         {style.label}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => handleMarkWasted(batch)}
-                        disabled={wasting === batch.id}
-                        className="text-xs bg-red-100 text-red-700 px-3 py-1 rounded-lg hover:bg-red-200 disabled:opacity-40 transition-colors"
-                      >
-                        {wasting === batch.id ? "Writing off…" : "Mark Wasted"}
-                      </button>
+                    <td style={{ textAlign: "right" }}>
+                      {batch.quantity_remaining > 0 && (
+                        <button
+                          onClick={() => handleWaste(batch)}
+                          disabled={wasting === batch.id}
+                          className="btn-danger"
+                        >
+                          {wasting === batch.id
+                            ? "Writing off…"
+                            : "Mark Wasted"}
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );
@@ -275,9 +352,9 @@ export default function ExpiryTracker() {
         </div>
       )}
 
-      <p className="text-xs text-gray-400">
-        💡 FIFO deduction is always active — orders automatically pull from the
-        oldest (nearest-expiry) batch first.
+      <p style={{ fontSize: 12, color: "#A8A29E", marginTop: 16 }}>
+        💡 Orders automatically deduct from the nearest-expiry batch first
+        (FIFO). Use "Mark Wasted" only for stock that cannot be used.
       </p>
     </div>
   );

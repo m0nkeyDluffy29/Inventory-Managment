@@ -4,11 +4,9 @@ import {
   createItem,
   updateItem,
   deleteItem,
+  updateCautionLevel,
 } from "../api/inventoryApi";
-import { updateCautionLevel } from "../api/inventoryApi";
-import InventoryTable from "../components/inventory/InventoryTable";
 import Modal from "../components/shared/Modal";
-import Spinner from "../components/shared/Spinner"; // ← ADD
 
 const UNITS = ["kg", "L", "pcs", "g", "ml"];
 const EMPTY = { name: "", unit: "kg", caution_level: 0, category: "" };
@@ -29,32 +27,62 @@ function QuickCautionEdit({ item, onSaved }) {
     }
   };
 
-  if (!editing) {
+  if (!editing)
     return (
-      <div className="flex items-center gap-1 justify-end">
-        <span className="font-mono">{item.caution_level}</span>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          justifyContent: "flex-end",
+        }}
+      >
+        <span style={{ fontFamily: "monospace", fontSize: 13 }}>
+          {item.caution_level}
+        </span>
         <button
           onClick={() => {
             setVal(item.caution_level);
             setEditing(true);
           }}
-          className="text-indigo-400 hover:text-indigo-600 text-xs ml-1"
+          style={{
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            color: "#A8A29E",
+            fontSize: 13,
+            padding: "2px 4px",
+          }}
+          title="Edit caution level"
         >
           ✎
         </button>
       </div>
     );
-  }
 
   return (
-    <div className="flex items-center gap-1 justify-end">
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 4,
+        justifyContent: "flex-end",
+      }}
+    >
       <input
         type="number"
         min="0"
         step="0.1"
         value={val}
         onChange={(e) => setVal(e.target.value)}
-        className="w-16 border rounded px-1.5 py-0.5 text-xs"
+        style={{
+          width: 60,
+          padding: "4px 6px",
+          border: "1.5px solid #F59E0B",
+          borderRadius: 6,
+          fontSize: 12,
+          fontFamily: "monospace",
+        }}
         autoFocus
         onKeyDown={(e) => {
           if (e.key === "Enter") save();
@@ -64,18 +92,46 @@ function QuickCautionEdit({ item, onSaved }) {
       <button
         onClick={save}
         disabled={saving}
-        className="text-xs text-green-600 hover:underline disabled:opacity-40"
+        style={{
+          background: "#F59E0B",
+          border: "none",
+          borderRadius: 6,
+          padding: "4px 8px",
+          cursor: "pointer",
+          fontSize: 12,
+          fontWeight: 600,
+        }}
       >
         {saving ? "…" : "✓"}
       </button>
       <button
         onClick={() => setEditing(false)}
-        className="text-xs text-gray-400 hover:underline"
+        style={{
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          color: "#A8A29E",
+          fontSize: 13,
+        }}
       >
         ✕
       </button>
     </div>
   );
+}
+
+function StatusBadge({ item }) {
+  if (item.caution_level === 0)
+    return <span className="badge badge-gray">No threshold</span>;
+  if (item.current_stock <= 0)
+    return <span className="badge badge-red">🔴 Out of stock</span>;
+  if (item.current_stock < item.caution_level) {
+    const deficit = (item.caution_level - item.current_stock).toFixed(1);
+    return (
+      <span className="badge badge-amber">⚠️ Low — need {deficit} more</span>
+    );
+  }
+  return <span className="badge badge-green">✓ OK</span>;
 }
 
 export default function Inventory() {
@@ -84,15 +140,15 @@ export default function Inventory() {
   const [editItem, setEditItem] = useState(null);
   const [form, setForm] = useState(EMPTY);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true); // ← ADD
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
   const load = () => {
-    setLoading(true); // ← ADD
+    setLoading(true);
     getItems()
       .then(setItems)
-      .finally(() => setLoading(false)); // ← ADD
+      .finally(() => setLoading(false));
   };
-
   useEffect(() => {
     load();
   }, []);
@@ -100,6 +156,7 @@ export default function Inventory() {
   const openCreate = () => {
     setEditItem(null);
     setForm(EMPTY);
+    setError("");
     setShowModal(true);
   };
   const openEdit = (item) => {
@@ -110,6 +167,7 @@ export default function Inventory() {
       caution_level: item.caution_level,
       category: item.category || "",
     });
+    setError("");
     setShowModal(true);
   };
 
@@ -129,75 +187,235 @@ export default function Inventory() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm("Delete this item?")) return;
+    if (!confirm("Delete this item? This cannot be undone.")) return;
     await deleteItem(id);
     load();
   };
+
+  const filtered = items.filter(
+    (i) =>
+      i.name.toLowerCase().includes(search.toLowerCase()) ||
+      (i.category || "").toLowerCase().includes(search.toLowerCase()),
+  );
 
   const lowCount = items.filter(
     (i) => i.caution_level > 0 && i.current_stock < i.caution_level,
   ).length;
 
-  // ← ADD
-  if (loading) return <Spinner />;
-
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">Inventory Items</h1>
-          {lowCount > 0 && (
-            <p className="text-sm text-amber-700 mt-0.5">
-              ⚠️ {lowCount} item{lowCount > 1 ? "s" : ""} below caution level
-            </p>
-          )}
+    <div>
+      <div className="page-header">
+        <h1>Inventory Items</h1>
+        <p>Track and manage all your ingredients and supplies.</p>
+      </div>
+
+      {/* Summary strip */}
+      {lowCount > 0 && (
+        <div className="alert-strip alert-amber" style={{ marginBottom: 20 }}>
+          ⚠️{" "}
+          <strong>
+            {lowCount} item{lowCount > 1 ? "s" : ""}
+          </strong>{" "}
+          are below their caution level and need reordering.
         </div>
-        <button
-          onClick={openCreate}
-          className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700"
-        >
+      )}
+
+      {/* Toolbar */}
+      <div
+        style={{
+          display: "flex",
+          gap: 12,
+          marginBottom: 20,
+          alignItems: "center",
+        }}
+      >
+        <input
+          type="text"
+          placeholder="Search items or category…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="input"
+          style={{ maxWidth: 320 }}
+        />
+        <div style={{ flex: 1 }} />
+        <button onClick={openCreate} className="btn-primary">
           + Add Item
         </button>
       </div>
 
-      <InventoryTablePhase4
-        items={items}
-        onEdit={openEdit}
-        onDelete={handleDelete}
-        onRefresh={load}
-        QuickCautionEdit={QuickCautionEdit}
-      />
+      {/* Table */}
+      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+        {loading ? (
+          <div className="spinner-wrap">
+            <div className="spinner" />
+          </div>
+        ) : filtered.length === 0 ? (
+          <div
+            className="empty-state"
+            style={{ border: "none", borderRadius: 16 }}
+          >
+            <div className="empty-icon">📦</div>
+            <h3>
+              {search ? "No items match your search" : "No inventory items yet"}
+            </h3>
+            <p>
+              {search
+                ? "Try a different search term."
+                : 'Click "+ Add Item" to add your first ingredient.'}
+            </p>
+          </div>
+        ) : (
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Category</th>
+                <th style={{ textAlign: "right" }}>Stock</th>
+                <th style={{ textAlign: "right" }}>Unit</th>
+                <th style={{ textAlign: "right" }}>Caution Level ✎</th>
+                <th>Status</th>
+                <th style={{ textAlign: "right" }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((item) => {
+                const isLow =
+                  item.caution_level > 0 &&
+                  item.current_stock < item.caution_level;
+                return (
+                  <tr
+                    key={item.id}
+                    style={{ background: isLow ? "#FFFBEB" : undefined }}
+                  >
+                    <td style={{ fontWeight: 600, color: "#1C1917" }}>
+                      {item.name}
+                    </td>
+                    <td style={{ color: "#78716C" }}>
+                      {item.category ? (
+                        <span className="badge badge-blue">
+                          {item.category}
+                        </span>
+                      ) : (
+                        <span style={{ color: "#A8A29E" }}>—</span>
+                      )}
+                    </td>
+                    <td
+                      style={{
+                        textAlign: "right",
+                        fontFamily: "monospace",
+                        fontWeight: 700,
+                        color: isLow ? "#C2410C" : "#1C1917",
+                        fontSize: 15,
+                      }}
+                    >
+                      {item.current_stock}
+                    </td>
+                    <td
+                      style={{
+                        textAlign: "right",
+                        color: "#78716C",
+                        fontSize: 13,
+                      }}
+                    >
+                      {item.unit}
+                    </td>
+                    <td style={{ textAlign: "right" }}>
+                      <QuickCautionEdit item={item} onSaved={load} />
+                    </td>
+                    <td>
+                      <StatusBadge item={item} />
+                    </td>
+                    <td style={{ textAlign: "right" }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 6,
+                          justifyContent: "flex-end",
+                        }}
+                      >
+                        <button
+                          onClick={() => openEdit(item)}
+                          style={{
+                            background: "#EDE9E3",
+                            border: "none",
+                            borderRadius: 7,
+                            padding: "5px 12px",
+                            cursor: "pointer",
+                            fontSize: 12,
+                            fontWeight: 600,
+                            color: "#1C1917",
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDelete(item.id)}
+                          className="btn-danger"
+                          style={{ padding: "5px 10px" }}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
 
+      {/* Item count */}
+      {!loading && filtered.length > 0 && (
+        <p
+          style={{
+            fontSize: 12,
+            color: "#A8A29E",
+            marginTop: 10,
+            textAlign: "right",
+          }}
+        >
+          Showing {filtered.length} of {items.length} items
+        </p>
+      )}
+
+      {/* Modal */}
       {showModal && (
         <Modal
-          title={editItem ? "Edit Item" : "New Item"}
+          title={editItem ? `Edit — ${editItem.name}` : "New Inventory Item"}
           onClose={() => setShowModal(false)}
         >
-          <form onSubmit={handleSave} className="space-y-3">
+          <form
+            onSubmit={handleSave}
+            style={{ display: "flex", flexDirection: "column", gap: 16 }}
+          >
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Name
-              </label>
+              <label className="label">Item Name</label>
               <input
                 value={form.name}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, name: e.target.value }))
                 }
                 required
-                className="w-full border rounded-lg px-3 py-2 text-sm"
+                className="input"
+                placeholder="e.g. Tomatoes"
               />
             </div>
-            <div className="flex gap-3">
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Unit
-                </label>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 12,
+              }}
+            >
+              <div>
+                <label className="label">Unit</label>
                 <select
                   value={form.unit}
                   onChange={(e) =>
                     setForm((f) => ({ ...f, unit: e.target.value }))
                   }
-                  className="w-full border rounded-lg px-3 py-2 text-sm"
+                  className="input"
                 >
                   {UNITS.map((u) => (
                     <option key={u} value={u}>
@@ -206,10 +424,18 @@ export default function Inventory() {
                   ))}
                 </select>
               </div>
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Caution Level
-                  <span className="text-gray-400 font-normal ml-1 text-xs">
+              <div>
+                <label className="label">
+                  Caution Level{" "}
+                  <span
+                    style={{
+                      color: "#A8A29E",
+                      fontSize: 10,
+                      fontWeight: 400,
+                      textTransform: "none",
+                      letterSpacing: 0,
+                    }}
+                  >
                     (reorder threshold)
                   </span>
                 </label>
@@ -221,136 +447,45 @@ export default function Inventory() {
                   onChange={(e) =>
                     setForm((f) => ({ ...f, caution_level: e.target.value }))
                   }
-                  className="w-full border rounded-lg px-3 py-2 text-sm"
+                  className="input"
                 />
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Category
-              </label>
+              <label className="label">Category</label>
               <input
                 value={form.category}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, category: e.target.value }))
                 }
-                className="w-full border rounded-lg px-3 py-2 text-sm"
-                placeholder="e.g. Vegetables"
+                className="input"
+                placeholder="e.g. Vegetables, Dairy, Grains"
               />
             </div>
-            {error && <p className="text-red-600 text-sm">{error}</p>}
-            <button
-              type="submit"
-              className="w-full bg-indigo-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-indigo-700"
-            >
-              Save
-            </button>
+            {error && (
+              <div
+                className="alert-strip alert-red"
+                style={{ padding: "10px 14px", fontSize: 13 }}
+              >
+                ⚠️ {error}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+              <button
+                type="button"
+                onClick={() => setShowModal(false)}
+                className="btn-ghost"
+                style={{ flex: 1 }}
+              >
+                Cancel
+              </button>
+              <button type="submit" className="btn-primary" style={{ flex: 2 }}>
+                {editItem ? "Save Changes" : "Add Item"}
+              </button>
+            </div>
           </form>
         </Modal>
       )}
-    </div>
-  );
-}
-
-function InventoryTablePhase4({
-  items,
-  onEdit,
-  onDelete,
-  onRefresh,
-  QuickCautionEdit,
-}) {
-  if (!items?.length)
-    return (
-      <div className="text-center py-16 border-2 border-dashed border-gray-200 rounded-xl">
-        <p className="text-4xl mb-2">📦</p>
-        <p className="font-medium text-gray-600">No inventory items yet</p>
-        <p className="text-sm text-gray-400 mt-1">
-          Click "+ Add Item" to add your first ingredient.
-        </p>
-      </div>
-    );
-
-  return (
-    <div className="overflow-x-auto rounded-lg border border-gray-200">
-      <table className="w-full text-sm">
-        <thead className="bg-gray-50 text-gray-600 uppercase text-xs">
-          <tr>
-            <th className="px-4 py-3 text-left">Name</th>
-            <th className="px-4 py-3 text-left">Category</th>
-            <th className="px-4 py-3 text-right">Stock</th>
-            <th className="px-4 py-3 text-right">Unit</th>
-            <th className="px-4 py-3 text-right">Caution Level ✎</th>
-            <th className="px-4 py-3 text-left">Status</th>
-            <th className="px-4 py-3 text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100">
-          {items.map((item) => {
-            const isLow =
-              item.caution_level > 0 && item.current_stock < item.caution_level;
-            const deficit = isLow
-              ? (item.caution_level - item.current_stock).toFixed(2)
-              : null;
-            return (
-              <tr
-                key={item.id}
-                className={
-                  isLow ? "bg-amber-50 hover:bg-amber-100" : "hover:bg-gray-50"
-                }
-              >
-                <td className="px-4 py-3 font-medium text-gray-800">
-                  {item.name}
-                </td>
-                <td className="px-4 py-3 text-gray-500">
-                  {item.category || "—"}
-                </td>
-                <td
-                  className={`px-4 py-3 text-right font-mono ${isLow ? "text-red-600 font-bold" : ""}`}
-                >
-                  {item.current_stock}
-                </td>
-                <td className="px-4 py-3 text-right text-gray-500">
-                  {item.unit}
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <QuickCautionEdit item={item} onSaved={onRefresh} />
-                </td>
-                <td className="px-4 py-3">
-                  {item.caution_level === 0 ? (
-                    <span className="text-gray-400 text-xs">No threshold</span>
-                  ) : item.current_stock <= 0 ? (
-                    <span className="bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded-full">
-                      Out of stock
-                    </span>
-                  ) : isLow ? (
-                    <span className="bg-amber-100 text-amber-700 text-xs px-2 py-0.5 rounded-full">
-                      Low — need {deficit} more
-                    </span>
-                  ) : (
-                    <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full">
-                      OK
-                    </span>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-right space-x-2">
-                  <button
-                    onClick={() => onEdit(item)}
-                    className="text-indigo-600 hover:underline text-xs"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => onDelete(item.id)}
-                    className="text-red-500 hover:underline text-xs"
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
     </div>
   );
 }

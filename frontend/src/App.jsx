@@ -1,6 +1,6 @@
-import { BrowserRouter, Routes, Route, Navigate, Link } from "react-router-dom"; // ← add Link here
+import { BrowserRouter, Routes, Route, Navigate, Link } from "react-router-dom";
 import { useAuth } from "./hooks/useAuth";
-import Navbar from "./components/shared/Navbar";
+import Sidebar from "./components/shared/Sidebar";
 import Dashboard from "./pages/Dashboard";
 import Inventory from "./pages/Inventory";
 import NewDelivery from "./pages/NewDelivery";
@@ -24,9 +24,14 @@ export default function App() {
           path="/*"
           element={
             <PrivateRoute>
-              <div className="min-h-screen bg-gray-50">
-                <Navbar />
-                <main className="max-w-7xl mx-auto px-4 py-6">
+              <div className="app-shell">
+                <Sidebar />
+                <main
+                  className="main-content"
+                  style={{ padding: "32px 32px 32px", paddingTop: "32px" }}
+                >
+                  {/* Mobile top spacing */}
+                  <div className="md:hidden" style={{ height: 56 }} />
                   <Routes>
                     <Route path="/" element={<Dashboard />} />
                     <Route path="/inventory" element={<Inventory />} />
@@ -35,19 +40,23 @@ export default function App() {
                     <Route path="/recipes" element={<Recipes />} />
                     <Route path="/expiry" element={<ExpiryTracker />} />
                     <Route path="/alerts" element={<ReorderAlerts />} />
-
-                    {/* ← ADD this as the last route */}
                     <Route
                       path="*"
                       element={
-                        <div className="text-center py-20">
-                          <p className="text-4xl mb-3">🔍</p>
-                          <h2 className="text-xl font-bold text-gray-700">
-                            Page not found
-                          </h2>
+                        <div className="empty-state" style={{ marginTop: 80 }}>
+                          <div className="empty-icon">🔍</div>
+                          <h3>Page not found</h3>
+                          <p>The page you're looking for doesn't exist.</p>
                           <Link
                             to="/"
-                            className="text-indigo-600 hover:underline text-sm mt-2 block"
+                            style={{
+                              display: "inline-block",
+                              marginTop: 16,
+                              color: "#F59E0B",
+                              fontSize: 14,
+                              fontWeight: 600,
+                              textDecoration: "none",
+                            }}
                           >
                             ← Back to Dashboard
                           </Link>
