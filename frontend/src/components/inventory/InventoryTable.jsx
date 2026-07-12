@@ -1,3 +1,4 @@
+import React from "react"
 import CautionLevelBadge from "./CautionLevelBadge";
 
 export default function InventoryTable({ items, onEdit, onDelete }) {

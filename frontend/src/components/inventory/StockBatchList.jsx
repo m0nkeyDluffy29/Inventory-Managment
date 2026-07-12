@@ -1,3 +1,4 @@
+import React from "react"
 import { format, differenceInDays, isPast, isToday } from "date-fns";
 import { useState } from "react";
 import { markBatchWastedFromInventory } from "../../api/inventoryApi";

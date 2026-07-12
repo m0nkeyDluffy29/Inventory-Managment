@@ -1,3 +1,4 @@
+import React from "react"
 export default function CautionLevelBadge({ stock, level }) {
   if (level === 0)
     return <span className="text-gray-400 text-xs">No threshold</span>;
