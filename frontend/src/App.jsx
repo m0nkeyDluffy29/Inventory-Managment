@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate, Link } from "react-router-dom";
+import React from "react";
 import { useAuth } from "./hooks/useAuth";
 import Sidebar from "./components/shared/Sidebar";
 import Dashboard from "./pages/Dashboard";
