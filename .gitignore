@@ -9,3 +9,5 @@
 vite.config.js
 Inventory-managment.md
 Smart_Inventory_System_Overview.docx
+.vercel
+.env*

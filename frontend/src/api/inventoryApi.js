@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: (import.meta.env.VITE_API_URL || "") + "/api",
+  baseURL: "https://inventory-managment-production-8d06.up.railway.app/api",
 });
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("inv_token");
